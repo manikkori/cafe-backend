@@ -1,80 +1,68 @@
-import express from 'express';
-import mongoose from 'mongoose';
-import cors from 'cors';
-import dotenv from 'dotenv';
-
-// Load environment variables
-dotenv.config();
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// Security: Sirf Frontend ko allow karenge
-const corsOptions = {
-  origin: process.env.FRONTEND_URL, 
-  methods: ['GET', 'POST'],
-  credentials: true,
-  optionsSuccessStatus: 200
-};
-const allowedOrigins = process.env.FRONTEND_URL || "http://localhost:5173";
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://cafedemo-five.vercel.app"
+];
+
 app.use(cors({
-    origin: allowedOrigins, 
-    methods: ['GET', 'POST', 'DELETE', 'PUT'], 
-    allowedHeaders: ['Content-Type']
+  origin: function(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ["GET", "POST", "DELETE", "PUT"],
+  credentials: true
 }));
-app.use(express.json()); // Parse incoming JSON data
 
-// Database Connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('🔥 MongoDB Connected Successfully'))
-  .catch(err => console.error('❌ MongoDB Connection Error:', err));
+app.use(express.json());
 
-// ------------------------------------
-// DATABASE SCHEMA & MODEL
-// ------------------------------------
+mongoose.connect(process.env.MONGO_URI);
+
 const reservationSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  phone: { type: String, required: true },
-  date: { type: String, required: true },
-  guests: { type: Number, required: true }
+  name: String,
+  phone: String,
+  date: String,
+  guests: Number
 }, { timestamps: true });
 
 const Reservation = mongoose.model('Reservation', reservationSchema);
 
-// ------------------------------------
-// API ROUTES
-// ------------------------------------
 app.post('/api/reservations', async (req, res) => {
   try {
     const newReservation = new Reservation(req.body);
     await newReservation.save();
-    res.status(201).json({ message: 'Table reserved successfully! The Chef awaits.' });
+    res.status(201).json(newReservation);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to reserve table.' });
+    res.status(500).json({ error: 'Failed to save.' });
   }
 });
-// Get all reservations (for admin purposes, not linked to frontend)
+
 app.get('/api/reservations', async (req, res) => {
   try {
-    // sort({ createdAt: -1 }) ka matlab latest booking sabse upar aayegi
     const reservations = await Reservation.find().sort({ createdAt: -1 });
     res.status(200).json(reservations);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch reservations.' });
+    res.status(500).json({ error: 'Failed to fetch.' });
   }
 });
 
 app.delete('/api/reservations/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    await Reservation.findByIdAndDelete(id); 
-    res.status(200).json({ message: 'Booking deleted successfully.' });
+    await Reservation.findByIdAndDelete(id);
+    res.status(200).json({ message: 'Deleted.' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to delete booking.' });
+    res.status(500).json({ error: 'Failed to delete.' });
   }
 });
 
-// Start Server
-app.listen(PORT, () => {
-  console.log(`🚀 Backend running securely on port ${PORT}`);
-});
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
